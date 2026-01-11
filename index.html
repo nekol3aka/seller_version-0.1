@@ -41,12 +41,21 @@
         .item-main { display: flex; justify-content: space-between; font-weight: 600; }
         .item-sub { font-size: 0.85em; color: #666; margin-top: 4px; }
 
+        /* สไตล์ปุ่มจัดการที่เพิ่มใหม่ */
+        .manage-link { text-align: right; margin-bottom: 15px; }
+        .btn-manage { background: #34495e; color: white; border: none; padding: 8px 15px; cursor: pointer; font-size: 0.85em; }
+        .btn-manage:hover { background: #2c3e50; }
+
         @media (max-width: 700px) { .form-row { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
 
 <div class="container">
+    <div class="manage-link">
+        <a href="addjs.html"><button class="btn-manage">⚙️ จัดการสินค้า (Add JS)</button></a>
+    </div>
+
     <h2>📝 บันทึกรายการสินค้า</h2>
 
     <input id="shopName" placeholder="ระบุชื่อร้านค้า" style="width:100%; margin-bottom:15px">

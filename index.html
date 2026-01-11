@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบบันทึกสินค้า - ดึงข้อมูลจากไฟล์</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <script src="product.js"></script>
+
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Sarabun', sans-serif; background: #f0f2f5; padding: 20px; display: flex; justify-content: center; }
+        .container { background: #fff; padding: 25px; border-radius: 15px; width: 100%; max-width: 900px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #2c3e50; margin-bottom: 20px; }
+        
+        input, button { font-family: 'Sarabun', sans-serif; padding: 12px; border-radius: 8px; border: 1px solid #ddd; outline: none; }
+        /* Grid ปรับให้รองรับ search container ในช่องชื่อ */
+        .form-row { display: grid; grid-template-columns: 1fr 120px 1fr 80px 100px; gap: 10px; margin-bottom: 15px; }
+
+        /* ส่วนรายการแนะนำ */
+        .search-container { position: relative; }
+        .suggestion-box {
+            position: absolute; top: 100%; left: 0; right: 0;
+            background: white; border: 1px solid #ddd; z-index: 1000; 
+            border-radius: 0 0 8px 8px; display: none; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            max-height: 200px; overflow-y: auto; /* เพิ่ม scroll กรณีรายการเยอะ */
+        }
+        .suggestion-item { padding: 12px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 14px; }
+        .suggestion-item:hover { background: #f8f9fa; color: #3498db; }
+
+        /* ปุ่มและใบเสร็จ */
+        .add { background: #27ae60; color: white; width: 100%; margin-bottom: 20px; }
+        .save { background: #3498db; color: white; flex: 1; }
+        .clear { background: #95a5a6; color: white; flex: 1; }
+        #receipt { background: #fff; border: 2px solid #333; padding: 30px; border-radius: 4px; min-height: 350px; }
+        .shop-name { text-align: center; font-size: 1.5em; font-weight: 700; margin-bottom: 15px; }
+        .item-row { border-bottom: 1px dashed #ccc; padding: 10px 0; }
+        .item-main { display: flex; justify-content: space-between; font-weight: 600; }
+        .item-sub { font-size: 0.85em; color: #666; margin-top: 4px; }
+
+        @media (max-width: 700px) { .form-row { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>📝 บันทึกรายการสินค้า</h2>
+
+    <input id="shopName" placeholder="ระบุชื่อร้านค้า" style="width:100%; margin-bottom:15px">
+
+    <div class="form-row">
+        <div class="search-container">
+            <input id="productCode" placeholder="พิมพ์รหัสสินค้า..." style="width:100%" autocomplete="off">
+            <div id="suggestionBox" class="suggestion-box"></div>
+        </div>
+
+        <input id="factory" placeholder="โรงงาน">
+        
+        <div class="search-container">
+            <input id="productName" placeholder="ชื่อสินค้า" style="width:100%" autocomplete="off">
+            <div id="suggestionBoxName" class="suggestion-box"></div>
+        </div>
+
+        <input id="qty" type="number" value="1" min="1">
+        <input id="unit" placeholder="หน่วย">
+    </div>
+
+    <button class="add" onclick="addItem()">➕ เพิ่มรายการ</button>
+
+    <div id="receipt">
+        <div class="shop-name" id="showShop">ชื่อร้านค้า</div>
+        <div id="date" style="text-align:center; font-size:0.9em; margin-bottom:20px;"></div>
+        <div id="itemsList"></div>
+    </div>
+
+    <div style="display:flex; gap:10px; margin-top:20px;">
+        <button class="clear" onclick="newBill()">🧾 ล้างบิล</button>
+        <button class="save" onclick="saveImage()">📸 บันทึกภาพ</button>
+    </div>
+</div>
+
+<script>
+    const productData = typeof products !== 'undefined' ? products : [];
+
+    const productCodeInput = document.getElementById('productCode');
+    const suggestionBox = document.getElementById('suggestionBox');
+    const factoryInput = document.getElementById('factory');
+    const productNameInput = document.getElementById('productName');
+    const suggestionBoxName = document.getElementById('suggestionBoxName'); // ตัวแปรใหม่
+    const qtyInput = document.getElementById('qty');
+    const unitInput = document.getElementById('unit');
+    const itemsList = document.getElementById('itemsList');
+
+    // 1. ระบบค้นหาด้วย รหัสสินค้า
+    productCodeInput.addEventListener('input', function() {
+        const val = this.value.toUpperCase();
+        suggestionBox.innerHTML = '';
+        if (!val) { suggestionBox.style.display = 'none'; return; }
+
+        const matches = productData.filter(p => p.code.startsWith(val)).slice(0, 5);
+        renderSuggestions(matches, suggestionBox, true);
+    });
+
+    // 2. ระบบค้นหาด้วย ชื่อสินค้า (เพิ่มใหม่)
+    productNameInput.addEventListener('input', function() {
+        const val = this.value.toLowerCase();
+        suggestionBoxName.innerHTML = '';
+        if (!val) { suggestionBoxName.style.display = 'none'; return; }
+
+        // ค้นหา name ที่มีคำว่า... (Includes)
+        const matches = productData.filter(p => p.name.toLowerCase().includes(val)).slice(0, 5);
+        renderSuggestions(matches, suggestionBoxName, false);
+    });
+
+    // ฟังก์ชันวาดรายการแนะนำ (ใช้ร่วมกันเพื่อลด code ซ้ำ)
+    function renderSuggestions(list, container, isCodeSearch) {
+        if (list.length > 0) {
+            list.forEach(p => {
+                const div = document.createElement('div');
+                div.className = 'suggestion-item';
+                // ปรับการแสดงผล: ถ้ารหัสหา ให้โชว์รหัสหนา, ถ้าชื่อหา ให้โชว์ชื่อหนา
+                div.innerHTML = isCodeSearch 
+                    ? `<strong>${p.code}</strong> - ${p.name}`
+                    : `<strong>${p.name}</strong> - ${p.code}`;
+
+                div.onclick = () => {
+                    productCodeInput.value = p.code;
+                    factoryInput.value = p.fact;
+                    productNameInput.value = p.name;
+                    unitInput.value = p.unt;
+                    
+                    container.style.display = 'none';
+                    qtyInput.focus();
+                };
+                container.appendChild(div);
+            });
+            container.style.display = 'block';
+        } else {
+            container.style.display = 'none';
+        }
+    }
+
+    // ปิดกล่องเมื่อคลิกข้างนอก (อัปเดตให้ปิดทั้ง 2 กล่อง)
+    document.addEventListener('click', (e) => {
+        if (e.target !== productCodeInput) suggestionBox.style.display = 'none';
+        if (e.target !== productNameInput) suggestionBoxName.style.display = 'none';
+    });
+
+    function addItem() {
+        if (!productNameInput.value) return;
+        const div = document.createElement('div');
+        div.className = 'item-row';
+        div.innerHTML = `
+            <div class="item-main"><span>${productNameInput.value}</span><span>${qtyInput.value} ${unitInput.value}</span></div>
+            <div class="item-sub">โรงงาน: ${factoryInput.value} | รหัส: ${productCodeInput.value}</div>
+        `;
+        itemsList.appendChild(div);
+        
+        [productCodeInput, factoryInput, productNameInput, unitInput].forEach(i => i.value = "");
+        qtyInput.value = 1;
+    }
+
+    function saveImage() {
+        document.getElementById('showShop').innerText = document.getElementById('shopName').value || "รายการสินค้า";
+        document.getElementById('date').innerText = "วันที่: " + new Date().toLocaleString('th-TH');
+        html2canvas(document.getElementById('receipt'), { scale: 2 }).then(canvas => {
+            const a = document.createElement('a');
+            a.download = `Bill.png`;
+            a.href = canvas.toDataURL();
+            a.click();
+        });
+    }
+
+    function newBill() {
+        if(confirm("ล้างข้อมูล?")) itemsList.innerHTML = "";
+    }
+</script>
+</body>
+</html>

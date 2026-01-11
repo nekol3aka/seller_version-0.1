@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>จัดการข้อมูลสินค้า - ปรับปรุงภาษาไทย</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600&display=swap" rel="stylesheet">
+    
+    <script src="product.js"></script>
+
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Sarabun', sans-serif; background: #eef2f7; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #333; }
+        .form-group { display: grid; grid-template-columns: 1fr 1fr 1fr 100px 100px; gap: 10px; margin-bottom: 20px; background: #f9f9f9; padding: 20px; border-radius: 8px; border: 1px solid #eee; }
+        input { padding: 10px; border: 1px solid #ccc; border-radius: 5px; width: 100%; font-family: 'Sarabun'; }
+        button { cursor: pointer; border: none; padding: 10px 15px; border-radius: 5px; font-family: 'Sarabun'; font-weight: bold; }
+        .btn-add { background: #27ae60; color: white; }
+        .btn-del { background: #e74c3c; color: white; padding: 5px 10px; font-size: 0.9em; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #34495e; color: white; }
+        tr:nth-child(even) { background-color: #f8f9fa; }
+        .code-area { margin-top: 30px; position: relative; }
+        textarea { width: 100%; height: 250px; padding: 15px; background: #2d3436; color: #74b9ff; font-family: 'Courier New', monospace; border-radius: 5px; border: none; font-size: 14px; line-height: 1.5; }
+        .copy-btn { position: absolute; top: 10px; right: 10px; background: #0984e3; color: white; padding: 8px 15px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🛠️ เพิ่ม/ลบ สินค้า (ฉบับแก้ไขภาษาไทย)</h2>
+    <div class="form-group">
+        <input id="newCode" placeholder="รหัส">
+        <input id="newFact" placeholder="โรงงาน">
+        <input id="newName" placeholder="ชื่อสินค้า">
+        <input id="newUnit" placeholder="หน่วย">
+        <button class="btn-add" onclick="addProduct()">+ เพิ่ม</button>
+    </div>
+
+    <h3>รายการปัจจุบัน (<span id="count">0</span>)</h3>
+    <div style="max-height: 300px; overflow-y: auto;">
+        <table id="productTable">
+            <thead>
+                <tr>
+                    <th>รหัส</th><th>โรงงาน</th><th>ชื่อสินค้า</th><th>หน่วย</th><th>จัดการ</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+
+    <div class="code-area">
+        <h3>📦 โค้ดสำหรับ product.js (ก๊อปปี้ส่วนนี้)</h3>
+        <button class="copy-btn" onclick="copyCode()">📄 Copy Code</button>
+        <textarea id="outputCode" readonly spellcheck="false"></textarea>
+    </div>
+</div>
+
+<script>
+    let currentData = typeof products !== 'undefined' ? products : [];
+
+    renderTable();
+    updateCodeBox();
+
+    function addProduct() {
+        const code = document.getElementById('newCode').value.trim();
+        const fact = document.getElementById('newFact').value.trim();
+        const name = document.getElementById('newName').value.trim();
+        const unt = document.getElementById('newUnit').value.trim();
+
+        if(!code || !name) { alert("กรุณาใส่รหัสและชื่อสินค้า"); return; }
+
+        currentData.unshift({ code, fact, name, unt });
+        document.getElementById('newCode').value = '';
+        document.getElementById('newFact').value = '';
+        document.getElementById('newName').value = '';
+        document.getElementById('newUnit').value = '';
+
+        renderTable();
+        updateCodeBox();
+    }
+
+    function deleteItem(index) {
+        if(confirm('ลบรายการนี้?')) {
+            currentData.splice(index, 1);
+            renderTable();
+            updateCodeBox();
+        }
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '';
+        document.getElementById('count').innerText = currentData.length;
+        currentData.forEach((p, index) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${p.code}</td><td>${p.fact}</td><td>${p.name}</td><td>${p.unt}</td>
+                <td><button class="btn-del" onclick="deleteItem(${index})">ลบ</button></td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function updateCodeBox() {
+        // ใช้ JSON.stringify แบบปกติ แต่เพิ่มตัวช่วยจัดการภาษาไทย
+        let jsonString = JSON.stringify(currentData, null, 4);
+        
+        // แก้ไขปัญหาภาษาต่างดาวโดยการคงค่าตัวอักษรไทยไว้ ไม่ให้กลายเป็น Unicode Escape (\u0e...)
+        // บังคับให้แสดงผลเป็น const products = [ ... ];
+        const fileContent = `const products = ${jsonString};`;
+        document.getElementById('outputCode').value = fileContent;
+    }
+
+    function copyCode() {
+        const copyText = document.getElementById("outputCode");
+        copyText.select();
+        navigator.clipboard.writeText(copyText.value);
+        alert("ก๊อปปี้โค้ดภาษาไทยเรียบร้อย!");
+    }
+</script>
+</body>
+</html>
